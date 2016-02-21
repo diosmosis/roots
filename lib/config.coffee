@@ -16,7 +16,7 @@ class Config
    * used in regular expressions. It is defined as a (derived) constant,
    * because the path seperator does not change over the course of a run.
   ###
-  
+
   PATH_SEPERATOR_REGEXP_STRING = path.sep.replace '\\', '\\\\'
 
   ###*
@@ -53,6 +53,7 @@ class Config
     @debug = false
     @live_reload = true
     @open_browser = !opts.no_open ? true
+    @package_root = find_package_root.call(@)
 
     load_config.call(@)
 
@@ -74,6 +75,21 @@ class Config
     ]
 
     @compilers = get_compilers.call(@)
+
+  ###*
+   * TODO docs + tests + think more about weird stuff that could happen
+  ###
+  find_package_root = ->
+    current_root = @roots.root
+    loop
+      if fs.existsSync(path.join(current_root, 'package.json'))
+        return current_root
+
+      current_root = path.dirname(current_root)
+
+      break if current_root == '/'
+
+    throw new Error("Cannot find package.json! Looking in " + @roots.root + " & parent directories.")
 
   ###*
    * This function is responsible for loading the app.coffee file into the
@@ -164,14 +180,14 @@ class Config
 
   get_compilers = ->
     res = {}
-    pkg_json_path = path.join(@roots.root, 'package.json')
+    pkg_json_path = path.join(@package_root, 'package.json')
     if not fs.existsSync(pkg_json_path) then return res
 
     pkg = require(pkg_json_path)
     for dep in _.keys(pkg.dependencies).concat(_.keys(pkg.devDependencies))
       if accord.supports(dep)
         try
-          local_compiler = path.join(@roots.root, 'node_modules', dep)
+          local_compiler = path.join(@package_root, 'node_modules', dep)
         catch err
           throw new Error("'#{dep}' not found. install it with 'npm install'")
 
